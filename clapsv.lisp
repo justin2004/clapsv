@@ -6,12 +6,12 @@
     (load quicklisp-init)))
 
 (eval-when (:compile-toplevel :load-toplevel :execute) 
-  (ql:quickload '("cl-csv" "april")
+  (ql:quickload '("cl-csv" "april" "alexandria")
                 :silent t))
 
 (defpackage :clapsv
   (:use :cl :april :cl-csv :cl-ppcre)
-  (:export :toplevel *ui*))
+  (:export :toplevel *ui*)) ; TODO need ui?
 
 (in-package :clapsv)
 
@@ -59,25 +59,29 @@
 
           (april "mat←↑{(','≠⍵)/⍵}¨¨{(1,1↓(','=⍵))⊂⍵}¨input")
 
-          (custom "make" 
-                  #'(lambda (column) (string-trim " " column)))
-          (custom "model" 
-                  #'(lambda (column) (string-trim " " column))
-                  #'(lambda (column) (regex-replace "[0-9]" column "_")))
-          (custom "model" 
-                  #'string-upcase
-                  "{⍸'I'=⍵}")
+          (let ((cust-stream (make-string-input-stream (concatenate 'string
+                                                                    (format nil "(in-package :clapsv)~%") ; TODO don't hardcode?
+                                                                    (alexandria:read-file-into-string "1.lisp" )) )))
+            (loop
+              :for expr = (read cust-stream nil)
+              :while (not (null expr))
+              :do (progn
+                    ; (format t "~A~%" expr)
+                    (eval expr))))
+
+          ; (identity *read-eval*) ;; ?
           ;look 
-          (april-f "mat")
+          ; (april-f "mat")
 
           ; 2d matrix to csv
           (cl-csv:write-csv (mapcar #'(lambda (x)
                                         (coerce x 'list)) 
                                     (coerce (april "↓mat")
-                                            'list)))))
+                                            'list))
+                            :stream *standard-output*)))
 
 
 (defun toplevel ()
-  ; (sb-ext:disable-debugger)
+  (sb-ext:disable-debugger)
   (run))
 
