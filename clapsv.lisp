@@ -15,17 +15,20 @@
 
 (in-package :clapsv)
 
+(defvar *config-file-name*)
+(defvar *target-file-name*)
 
-(defmacro custom (colname &rest funXs)
+
+(defmacro xform (colname &rest funs)
   "fun can be a string (apl) or a CL function"
   `(progn
      (april (:with (:state :in ((col_name ,colname)))) 
             "col_num←⊃⍸(⊂col_name)≡¨mat[1;]")
-     ,@(loop :for funX
-             :in  funXs
-             :collect `(april (:with (:store-fun (f (wrap (typecase ,funX
-                                                            (string (april ,funX))
-                                                            (t ,funX)))))) 
+     ,@(loop :for fun
+             :in  funs
+             :collect `(april (:with (:store-fun (f (wrap (typecase ,fun
+                                                            (string (april ,fun))
+                                                            (t ,fun)))))) 
                               "mat[1↓⍳⊃⍴mat;col_num]←f¨mat[1↓⍳⊃⍴mat;col_num]"))))
 
 (defun string-em (lis) 
@@ -53,7 +56,7 @@
 
 (defmacro run ()
   '(progn (april (with (:state :in
-                        ((i (coerce (uiop:read-file-lines "./some.csv")
+                        ((i (coerce (uiop:read-file-lines *target-file-name*)
                                     'vector) ))))
                  "input←i")
 
@@ -61,7 +64,7 @@
 
           (let ((cust-stream (make-string-input-stream (concatenate 'string
                                                                     (format nil "(in-package :clapsv)~%") ; TODO don't hardcode?
-                                                                    (alexandria:read-file-into-string "1.lisp" )) )))
+                                                                    (alexandria:read-file-into-string *config-file-name*)) )))
             (loop
               :for expr = (read cust-stream nil)
               :while (not (null expr))
@@ -80,8 +83,34 @@
                                             'list))
                             :stream *standard-output*)))
 
+(defun get-args ()
+  (let* ((args (uiop:command-line-arguments))
+         (config-file-name (car args))
+         (target-file-name (cadr args)))
+    (if (not (uiop:file-exists-p target-file-name))
+        (error (format nil "target-filename: \"~A\" does not exist~%" target-file-name )))
+    (if (not (uiop:file-exists-p config-file-name))
+        (error (format nil "config-filename \"~A\" does not exist~%" config-file-name)))
+    (format t "args: ~A/~A~%" config-file-name target-file-name)
+    (setf *config-file-name* config-file-name)
+    (setf *target-file-name* target-file-name)))
+
+
 
 (defun toplevel ()
   (sb-ext:disable-debugger)
+  (get-args)
   (run))
 
+
+;;;;;;;;
+
+; (ql:quickload :flamegraph)
+; (flamegraph:save-flame-graph ("/mnt/some.flame") 
+;   (april "mat←↑{(','≠⍵)/⍵}¨¨{(1,1↓(','=⍵))⊂⍵}¨input"))
+; (april "input")
+; (april "1 2⌷'one' 'two' 'three'")
+; (april "1 4 5 ⌷ 3 3 ⍴ ⍳9")
+; (april-f "↑4 5 4 ,¨ 8 9 0")
+; (april "1 2 3 + 5 6 7")
+; (april "(⊂4 5 4) , ⊂8 9 0")
